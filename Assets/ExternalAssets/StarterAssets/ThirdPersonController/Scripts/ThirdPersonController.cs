@@ -1,4 +1,5 @@
-﻿ using UnityEngine;
+﻿using UnityEditor.Rendering;
+using UnityEngine;
 #if ENABLE_INPUT_SYSTEM 
 using UnityEngine.InputSystem;
 #endif
@@ -12,8 +13,9 @@ namespace StarterAssets
 #if ENABLE_INPUT_SYSTEM 
     [RequireComponent(typeof(PlayerInput))]
 #endif
-    public class ThirdPersonController : MonoBehaviour
+    public class ThirdPersonController : MonoBehaviour, IGrabbableObjectParent
     {
+        #region Default variables
         [Header("Player")]
         [Tooltip("Move speed of the character in m/s")]
         public float MoveSpeed = 2.0f;
@@ -121,6 +123,21 @@ namespace StarterAssets
 #endif
             }
         }
+        #endregion
+        [Header("Interaction Config")]
+        [SerializeField] private LayerMask interactionLayerMask;
+        [SerializeField] private float interactionRadius = 1.0f;
+        [SerializeField] private float maxDistanceToInteractable = 2.0f;
+        [SerializeField] private float startOffsetFromCamera = 3f;
+        Ray rayFromCamera;
+        Vector3 originFromCamera;
+        Vector3 directionFromCamera;
+        Vector3 offsetOrigin;
+        [Header("Grabbed Object Config")]
+        [SerializeField] private Transform objectHoldPoint;
+        private IGrabbable heldObject;        
+
+
 
 
         private void Awake()
@@ -134,6 +151,7 @@ namespace StarterAssets
 
         private void Start()
         {
+            #region Default Start
             _cinemachineTargetYaw = CinemachineCameraTarget.transform.rotation.eulerAngles.y;
             
             _hasAnimator = TryGetComponent(out _animator);
@@ -150,22 +168,28 @@ namespace StarterAssets
             // reset our timeouts on start
             _jumpTimeoutDelta = JumpTimeout;
             _fallTimeoutDelta = FallTimeout;
+
+            #endregion
+            
         }
 
         private void Update()
         {
             _hasAnimator = TryGetComponent(out _animator);
-
+            
+            UpdateInteractionRay();
+            DropObject();
             JumpAndGravity();
             GroundedCheck();
             Move();
+            Interaction();
         }
 
         private void LateUpdate()
         {
             CameraRotation();
         }
-
+        #region Default Input Actions
         private void AssignAnimationIDs()
         {
             _animIDSpeed = Animator.StringToHash("Speed");
@@ -357,6 +381,7 @@ namespace StarterAssets
 
         private void OnDrawGizmosSelected()
         {
+            UpdateInteractionRay();                
             Color transparentGreen = new Color(0.0f, 1.0f, 0.0f, 0.35f);
             Color transparentRed = new Color(1.0f, 0.0f, 0.0f, 0.35f);
 
@@ -367,6 +392,23 @@ namespace StarterAssets
             Gizmos.DrawSphere(
                 new Vector3(transform.position.x, transform.position.y - GroundedOffset, transform.position.z),
                 GroundedRadius);
+
+
+            // Interaction Gizmos
+            
+            Gizmos.color = Color.cyan;
+
+            Vector3 start = offsetOrigin;
+            Vector3 end = offsetOrigin + directionFromCamera * maxDistanceToInteractable;
+
+            // Esfera inicial
+            Gizmos.DrawWireSphere(start, interactionRadius);
+
+            // Esfera final
+            Gizmos.DrawWireSphere(end, interactionRadius);
+
+            // Línea central
+            Gizmos.DrawLine(start, end);
         }
 
         private void OnFootstep(AnimationEvent animationEvent)
@@ -388,5 +430,76 @@ namespace StarterAssets
                 AudioSource.PlayClipAtPoint(LandingAudioClip, transform.TransformPoint(_controller.center), FootstepAudioVolume);
             }
         }
+        #endregion
+
+        private void Interaction()
+        {            
+            if(!Physics.SphereCast(offsetOrigin, interactionRadius, directionFromCamera, out RaycastHit hitInfo, maxDistanceToInteractable, interactionLayerMask)) return;
+                        
+            IInteractable  interactable = hitInfo.transform.GetComponentInParent<IInteractable>();                
+
+            if (interactable == null) return;
+                                
+            if (_input.interact)
+            {                        
+                interactable.Interact(this.transform);
+                _input.interact = false;
+            }                                        
+                        
+        }
+        private void DropObject()
+        {
+            if (heldObject == null) return;            
+            if (_input.drop)
+            {                                        
+                heldObject.OnRelease();                
+                ClearHeldObject();
+                _input.drop = false;
+            }
+        }
+
+        private void UpdateInteractionRay()
+        {                        
+            rayFromCamera = Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
+            originFromCamera = rayFromCamera.origin;
+            offsetOrigin = originFromCamera + directionFromCamera * startOffsetFromCamera;
+
+            directionFromCamera = rayFromCamera.direction;
+        }
+
+        public Transform GetObjectHoldPoint()
+        {
+            return objectHoldPoint;
+        }
+
+        public void SetHeldObject(Transform heldObject)
+        {
+            if(heldObject.TryGetComponent<IGrabbable>(out IGrabbable grabbable))
+            {                
+                this.heldObject = grabbable;
+            }
+            else
+            {
+                Debug.LogWarning("The object assigned is not grabbable.");
+            }
+                
+        }
+
+        public IGrabbable GetGrabbableObject()
+        {
+            return heldObject;
+        }
+
+        public void ClearHeldObject()
+        {
+            heldObject = null;
+        }
+
+        public bool HasHeldObject()
+        {
+            return heldObject != null;
+        }
+
+        
     }
 }

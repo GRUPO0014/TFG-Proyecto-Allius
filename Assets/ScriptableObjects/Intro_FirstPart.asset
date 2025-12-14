@@ -1,0 +1,16 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c6500f168ffefef48a040be78299e317, type: 3}
+  m_Name: Intro_FirstPart
+  m_EditorClassIdentifier: Assembly-CSharp::GrabbableObjectSO
+  prefab: {fileID: 694094913002063071, guid: 0427aa14f568eac46a5995f242d96cad, type: 3}
+  objectName: Intro_FirstPart
